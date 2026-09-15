@@ -121,13 +121,19 @@ async fn run() -> Result<ExitCode, String> {
     match (protocol.as_str(), method.as_str()) {
         ("nwc", "notify") => nwc_notify(uri_arg, &args).await,
         ("nnc", "notify") => nnc_notify(uri_arg, &args).await,
+        // **What this crate knows, not what a node serves.** The two
+        // differ on purpose — `dln-node` implements fourteen of the
+        // sixteen NNC methods and says so — and the difference is the
+        // conformance question: this list against `get_info`'s.
         ("nwc", "methods") => {
+            eprintln!("methods this client knows — ask the node with: dln-ctrl nwc get_info");
             for m in nostr_ln::nwc::WalletMethod::ALL {
                 println!("{m}");
             }
             Ok(ExitCode::SUCCESS)
         }
         ("nnc", "methods") => {
+            eprintln!("methods this client knows — ask the node with: dln-ctrl nnc get_info");
             for m in nostr_ln::nnc::Method::ALL {
                 println!("{m}");
             }
@@ -183,6 +189,58 @@ fn credential(arg: Option<String>, var: &str) -> Result<String, String> {
 
 // ── NWC ──────────────────────────────────────────────────────────────
 
+/// Say what the node claims it sends, before settling in to wait.
+///
+/// **There is no way to ask a node what your own grant permits.** The
+/// info event is one event for every connection, so it advertises what
+/// the node *can* send rather than what you may receive, and a grant
+/// with no `notifications` section is invisible from here.
+///
+/// So this checks the half that is checkable: whether the node sends
+/// these at all. A requested type it never advertises will never arrive
+/// however good the grant, and saying so costs one round trip against a
+/// wait that would otherwise be indistinguishable from a working
+/// subscription.
+///
+/// Mission 27 lost a run to each half of this independently. Neither
+/// produces an error; both produce silence.
+async fn warn_if_unsent(w: &WalletConnect, wanted: &[WalletNotificationType]) {
+    let Ok(info) = w.call_raw("get_info", serde_json::json!({})).await else {
+        return; // get_info failing is the caller's problem, not this check's
+    };
+    let advertised: Vec<String> = info
+        .get("notifications")
+        .and_then(|v| v.as_array())
+        .map(|a| a.iter().filter_map(|v| v.as_str().map(str::to_string)).collect())
+        .unwrap_or_default();
+
+    if advertised.is_empty() {
+        eprintln!(
+            "warning: this node advertises no notifications at all — \
+             nothing will arrive"
+        );
+        return;
+    }
+    let unsent: Vec<&str> = wanted
+        .iter()
+        .map(|t| t.as_str())
+        .filter(|t| !advertised.iter().any(|a| a == t))
+        .collect();
+    if !unsent.is_empty() {
+        eprintln!(
+            "warning: this node does not advertise {} — it advertises {}",
+            join(unsent.into_iter()),
+            join(advertised.iter().map(String::as_str))
+        );
+    }
+    eprintln!(
+        "note: a grant without a `notifications` section also delivers nothing, \
+         and cannot be checked from here"
+    );
+}
+
+
+
 fn wallet(uri_arg: Option<String>) -> Result<WalletConnect, String> {
     let raw = credential(uri_arg, "NWC_URI")?;
     // The parse error is not shown. It would quote the URI back, and the
@@ -207,6 +265,7 @@ async fn nwc_call(
     // are ephemeral and no relay stores them.
     let stream = if notify_after {
         let types = WalletNotificationType::ALL;
+        warn_if_unsent(&w, &types).await;
         eprintln!("subscribed to {}", join(types.iter().map(|t| t.as_str())));
         Some(w.notifications(&types).await.map_err(|e| e.to_string())?)
     } else {
@@ -235,6 +294,7 @@ async fn nwc_call(
 async fn nwc_notify(uri_arg: Option<String>, types: &[String]) -> Result<ExitCode, String> {
     let w = wallet(uri_arg)?;
     let types = wanted_wallet_types(types);
+    warn_if_unsent(&w, &types).await;
     let mut stream = w.notifications(&types).await.map_err(|e| e.to_string())?;
 
     // Said before waiting, so "nothing arrived" is distinguishable from

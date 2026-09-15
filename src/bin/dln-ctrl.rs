@@ -382,11 +382,16 @@ async fn nnc_call(
     let n = node(uri_arg)?;
 
     if notify_after {
-        // **Opt in, or subscribe into silence.** `open_channel` and
-        // `close_channel` carry a `notify` field and the node honours a
-        // false one — `notify_false` in the mandatory suite proves it. A
-        // -n that subscribed correctly and forgot this would wait forever
-        // on a node that was told not to send.
+        // **Opt in.** `open_channel` and `close_channel` carry a `notify`
+        // field, and a node that honours it sends nothing when it is
+        // false — so a -n that subscribed correctly and left this unset
+        // would wait out its patience against a node behaving correctly.
+        //
+        // `dln-node` ignores the field (checked 2026-09-15), so this
+        // changes nothing there today. That is a defect in the node
+        // rather than a reason to omit this: the field is in the
+        // specification, the client has a function for setting it false,
+        // and the next node this tool meets may be the one that reads it.
         if matches!(method, "open_channel" | "close_channel") {
             if let Some(obj) = params.as_object_mut() {
                 obj.entry("notify").or_insert(serde_json::Value::Bool(true));

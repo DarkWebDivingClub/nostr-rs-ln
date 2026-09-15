@@ -14,6 +14,7 @@
 
 mod pending;
 
+use std::str::FromStr;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -251,6 +252,34 @@ impl NostrNodeControl {
     }
 
     /// Send a request and read its result as `R`.
+    /// Call a method by name, with its parameters as JSON.
+    ///
+    /// The typed methods are better for anything that compiles: a changed
+    /// field is a build failure rather than a surprise at runtime. This
+    /// exists for the cases where the method is **not known until it is
+    /// typed at a prompt** — a control tool, and checking whether
+    /// somebody else's node implements what it advertises.
+    ///
+    /// It deliberately does not validate the method name. A node that
+    /// does not implement it answers `NOT_IMPLEMENTED`, and hearing that
+    /// from the node is the whole point: a client-side "unknown command"
+    /// would answer a different question.
+    pub async fn call_raw(
+        &self,
+        method: &str,
+        params: serde_json::Value,
+    ) -> Result<serde_json::Value, Error> {
+        // `FromStr` here is infallible: an unrecognised name becomes
+        // `Unknown(s)` and goes out on the wire as typed, which is what
+        // lets this reach a method the crate has never heard of.
+        let method = Method::from_str(method).expect("infallible");
+        let response = self.send(Request::new(method, params)?).await?;
+        if let Some(e) = response.error {
+            return Err(Error::Refused(e));
+        }
+        Ok(response.result.unwrap_or(serde_json::Value::Null))
+    }
+
     async fn call<P, R>(&self, method: Method, params: P) -> Result<R, Error>
     where
         P: serde::Serialize,

@@ -170,102 +170,21 @@ unsubscribes.
 The `client` feature is off by default, so a consumer wanting only the
 types and the access layer does not pull a relay stack.
 
-## `dln-ctrl` — the same client, from a prompt
+## Driving a node from a prompt
 
-```bash
-cargo install --path . --features cli   # or: apt install dln-ctrl
-export NWC_URI='nostr+walletconnect://…'
-```
+[`dln-ctrl`](https://github.com/DarkWebDivingClub/dln-ctrl) is a command
+line over this crate — every method by name, with its parameters as JSON,
+and a `-n` flag that subscribes before it calls.
 
-Nothing in this estate was a client a person could type into. Every
-consumer of these protocols was a test harness or a service, and the cost
-showed: four defects found in one afternoon, three of which are **one
-call against a running node**, each reached by building a demo and
-waiting six minutes for a channel.
+It lives in **its own repository and depends on this one by git**, like
+any other consumer. It began as a binary in this repo behind a `cli`
+feature; that feature was the tell, since it existed only to keep a
+command line's dependencies out of a library that every node and tool
+links.
 
-**The method is not enumerated.** Its name goes on the wire as typed and
-`params` is the JSON object the wire carries:
-
-```bash
-dln-ctrl nwc get_info
-dln-ctrl nwc make_invoice '{"amount":120000,"description":"x"}'
-dln-ctrl nnc list_channels
-```
-
-So names are verbatim from the specification — no translation layer for
-one to drift in — every method works on the day it ships, and **a method
-this crate has never heard of** can still be called, which is exactly
-what checking somebody else's node needs:
-
-```bash
-$ dln-ctrl nwc estimate_onchain_fees '{"fees":{"1":0}}'
-dln-ctrl: NotImplemented: estimate_onchain_fees is not implemented
-$ echo $?
-1
-```
-
-That answer came from the node. A client-side "unknown command" would
-have answered a different question.
-
-### Three things it is for
-
-**Does the node work, and what does it claim?**
-
-```bash
-dln-ctrl nwc get_info          # what it serves
-dln-ctrl nwc methods           # what this client knows
-```
-
-The difference between those two lists is the conformance question.
-
-**Does my grant cover this?** Call it and read the refusal:
-
-```bash
-$ dln-ctrl nwc list_invoices
-dln-ctrl: Restricted: this controller may not call that method  (the grant may not permit this method)
-```
-
-**Is it sending notifications at all?**
-
-```bash
-$ dln-ctrl nwc notify
-warning: this node does not advertise channel_opened — it advertises payment_received, …
-subscribed to payment_received, payment_sent, hold_invoice_accepted
-waiting — ^C to stop
-```
-
-### `-n` subscribes before it calls
-
-```bash
-dln-ctrl nwc make_hold_invoice '{"amount":250000,"payment_hash":"ab…"}' -n
-dln-ctrl nnc open_channel '{"pubkey":"02ab…","amount_sats":2000000}' -n
-```
-
-**This is not ergonomics.** These notification kinds are ephemeral —
-`20000 ≤ n < 30000`, which [NIP-01](https://github.com/nostr-protocol/nips/blob/master/01.md)
-says relays are not expected to store. Call `open_channel`, then run
-`notify`, and the answer may already have come and gone with nothing to
-replay it. `-n` subscribes *first*, so the window never exists.
-
-It also sets `notify: true` for the methods that carry the field.
-Without that it would subscribe correctly and wait forever on a node that
-was told not to send.
-
-The first example is a maker's whole flow in one command: mint the hold
-invoice, print it, hang until somebody locks in.
-
-### Credentials
-
-`NWC_URI` is the whole credential — the URI carries a secret key. NNC's
-does not, so `nnc` needs `NNC_URI` **and** `NNC_SECRET`.
-
-A URI is a credential: nothing here prints one back, not in a parse
-error and not in a refusal. Prefer the environment to `--uri`, which is
-visible in `ps` to every user on the machine.
-
-The `cli` feature is off by default and adds no dependencies of its own —
-the argument parsing is forty lines, so the library that every node and
-tool links stays at five dependencies.
+Being an external consumer is the point. It exercises this crate the way
+a stranger would, which is what nothing in the estate was doing — and the
+first afternoon of it found five defects.
 
 ## The types are checked against the specification, not against themselves
 

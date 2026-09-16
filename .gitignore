@@ -1,3 +1,9 @@
 /target
 **/*.rs.bk
 /wip
+
+# Build leftovers from a packaging branch checkout. The debian/ tree
+# itself belongs to dln-ctrl now, and never on master.
+/debian/
+/vendor/
+/.cargo/

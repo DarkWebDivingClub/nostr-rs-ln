@@ -30,10 +30,6 @@ client = ["dep:nostr-sdk", "dep:tokio", "dep:futures"]
 # a consumer wanting only the types and the access layer pulls no relay
 # stack.
 transport = ["dep:nostr-sdk", "dep:tokio", "dep:futures"]
-# The `dln-ctrl` binary. Off by default so the library — which every node
-# and tool in the estate links — does not carry a command line's
-# dependencies. User Story 11 is the reason to keep it thin.
-cli = ["client", "dep:tokio"]
 
 [dev-dependencies]
 serde_json = "1"
@@ -47,8 +43,3 @@ trybuild = "1"
 [[test]]
 name = "compile_fail"
 required-features = ["transport"]
-
-[[bin]]
-name = "dln-ctrl"
-path = "src/bin/dln-ctrl.rs"
-required-features = ["cli"]

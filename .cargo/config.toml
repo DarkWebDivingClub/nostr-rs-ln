@@ -1,0 +1,15 @@
+[source.crates-io]
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/dukeh3/nostr.git?rev=9ac9adc2"]
+git = "https://github.com/dukeh3/nostr.git"
+rev = "9ac9adc2"
+replace-with = "vendored-sources"
+
+[source."git+https://github.com/shadowylab/async-wsocket?rev=0fed6c9c6aec7393ee0e9cf3933d76914ab427d3"]
+git = "https://github.com/shadowylab/async-wsocket"
+rev = "0fed6c9c6aec7393ee0e9cf3933d76914ab427d3"
+replace-with = "vendored-sources"
+
+[source.vendored-sources]
+directory = "vendor"

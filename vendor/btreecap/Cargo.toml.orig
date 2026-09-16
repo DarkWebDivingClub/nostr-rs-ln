@@ -1,0 +1,17 @@
+[package]
+name = "btreecap"
+version = "0.1.0"
+edition = "2021"
+description = "BTree with configurable capacity limits and overflow policies"
+authors = ["Yuki Kishimoto <yukikishimoto@protonmail.com>"]
+homepage = "https://github.com/shadowylab/btreecap"
+repository = "https://github.com/shadowylab/btreecap.git"
+license = "MIT"
+readme = "README.md"
+rust-version = "1.66.0"
+keywords = ["btree"]
+
+[features]
+default = ["std"]
+# Enables std library
+std = []
